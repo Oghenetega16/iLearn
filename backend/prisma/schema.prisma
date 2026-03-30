@@ -1,0 +1,101 @@
+// /backend/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ------------------------------------------------------
+// DATA MODELS
+// ------------------------------------------------------
+
+model User {
+  id            String       @id @default(uuid())
+  email         String       @unique
+  fullName      String?
+  avatarUrl     String?      // Hosted on Cloudinary/Supabase Storage
+  role          Role         @default(STUDENT)
+  createdAt     DateTime     @default(now())
+  
+  // Relationships
+  enrollments   Enrollment[]
+  progress      Progress[]
+}
+
+model Course {
+  id            String       @id @default(uuid())
+  title         String
+  description   String
+  price         Float        // 0.00 if free
+  thumbnailUrl  String?
+  category      String       // e.g., "Design", "Programming"
+  level         Level        @default(BEGINNER)
+  isPublished   Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  
+  // Relationships
+  lessons       Lesson[]
+  enrollments   Enrollment[]
+}
+
+model Lesson {
+  id            String       @id @default(uuid())
+  courseId      String
+  title         String
+  content       String?      // Text content or AI context
+  videoUrl      String?      // Cloudinary/Mux URL
+  orderIndex    Int          // To keep lessons in the right sequence
+  
+  // Relationships
+  course        Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  progress      Progress[]
+}
+
+// Tracks which user bought/enrolled in which course
+model Enrollment {
+  id            String       @id @default(uuid())
+  userId        String
+  courseId      String
+  stripeRef     String?      // To verify payment via Stripe
+  enrolledAt    DateTime     @default(now())
+
+  // Relationships
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course        Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId]) // A user can only enroll in a course once
+}
+
+// Tracks individual lesson completion for the progress bar
+model Progress {
+  id            String       @id @default(uuid())
+  userId        String
+  lessonId      String
+  isCompleted   Boolean      @default(false)
+  completedAt   DateTime?
+
+  // Relationships
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson        Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+// ------------------------------------------------------
+// ENUMS
+// ------------------------------------------------------
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
+}
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
