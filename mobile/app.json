@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "ilearn",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -45,7 +45,8 @@
           "merchantIdentifier": "merchant.com.ilearn",
           "enableGooglePay": true
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
