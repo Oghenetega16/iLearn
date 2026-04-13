@@ -4,6 +4,7 @@ import { View, Text, ScrollView, Image, TouchableOpacity, Dimensions, FlatList }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useHome } from '../../hooks/tabs/useHome'; // Import the new logic hook
 
 const { width } = Dimensions.get('window');
 
@@ -27,7 +28,6 @@ const COURSES = [
   { id: '5', title: 'Digital Marketing Pro', author: 'Emma Watson', price: '$60.00', rating: '4.6', image: 'https://images.unsplash.com/photo-1533750516457-a7f992034fec?q=80&w=500&auto=format&fit=crop' },
 ];
 
-// Removed bgColor properties
 const PROMOTIONS = [
   {
     id: '1',
@@ -54,7 +54,6 @@ const PROMOTIONS = [
 
 // --- REUSABLE COMPONENTS ---
 
-// 1. The Dynamic Auto-Scrolling Promo Banner
 const PromoCarousel = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
@@ -62,22 +61,17 @@ const PromoCarousel = () => {
   useEffect(() => {
     const timer = setInterval(() => {
       let nextIndex = currentIndex + 1;
-      if (nextIndex >= PROMOTIONS.length) {
-        nextIndex = 0;
-      }
+      if (nextIndex >= PROMOTIONS.length) nextIndex = 0;
       flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
       setCurrentIndex(nextIndex);
     }, 4000);
-
     return () => clearInterval(timer);
   }, [currentIndex]);
 
   const handleScroll = (event: any) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / width);
-    if (index !== currentIndex) {
-      setCurrentIndex(index);
-    }
+    if (index !== currentIndex) setCurrentIndex(index);
   };
 
   return (
@@ -93,13 +87,7 @@ const PromoCarousel = () => {
         renderItem={({ item }) => (
           <View style={{ width: width }} className="px-6">
             <View className="relative justify-center overflow-hidden rounded-3xl h-44">
-              {/* Full opacity image filling the background */}
-              <Image 
-                source={{ uri: item.image }} 
-                className="absolute inset-0 w-full h-full" 
-                resizeMode="cover"
-              />
-              {/* Semi-transparent dark overlay for text readability */}
+              <Image source={{ uri: item.image }} className="absolute inset-0 w-full h-full" resizeMode="cover" />
               <View className="absolute inset-0 bg-black/40" />
               <View className="pl-6">
                 <Text className="z-10 w-full text-2xl text-white font-kumbh-bold">{item.header}</Text>
@@ -110,22 +98,15 @@ const PromoCarousel = () => {
           </View>
         )}
       />
-      {/* Pagination Dots */}
       <View className="flex-row justify-center mt-4">
         {PROMOTIONS.map((_, index) => (
-          <View
-            key={index}
-            className={`h-2 rounded-full mx-1 transition-all ${
-              index === currentIndex ? 'w-6 bg-brand-primary' : 'w-2 bg-gray-300'
-            }`}
-          />
+          <View key={index} className={`h-2 rounded-full mx-1 transition-all ${index === currentIndex ? 'w-6 bg-brand-primary' : 'w-2 bg-gray-300'}`} />
         ))}
       </View>
     </View>
   );
 };
 
-// 2. Helper component to render standard horizontal course lists
 const CourseSection = ({ title, courses }: { title: string, courses: typeof COURSES }) => (
   <View className="mt-8">
     <View className="flex-row items-center justify-between px-6 mb-4">
@@ -134,7 +115,6 @@ const CourseSection = ({ title, courses }: { title: string, courses: typeof COUR
         <Text className="text-sm font-manrope-semi text-brand-secondary">View all</Text>
       </TouchableOpacity>
     </View>
-
     <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-6">
       {courses.map((course, index) => (
         <TouchableOpacity 
@@ -163,21 +143,32 @@ const CourseSection = ({ title, courses }: { title: string, courses: typeof COUR
 
 // --- MAIN SCREEN ---
 export default function HomeScreen() {
+  const { state } = useHome();
+
   return (
     <SafeAreaView className="flex-1 bg-brand-background">
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         
-        {/* 1. HEADER SECTION */}
+        {/* HEADER SECTION - Now Dynamic */}
         <View className="flex-row items-center justify-between px-6 py-4">
           <View className="flex-row items-center">
-            <Image source={{ uri: 'https://i.pravatar.cc/150?img=11' }} className="w-12 h-12 mr-3 rounded-full" />
+            <Image 
+              source={{ 
+                uri: state.profile?.avatar_url || 
+                `https://ui-avatars.com/api/?name=${state.profile?.full_name || 'User'}&background=9BFD7B&color=091413` 
+              }} 
+              className="w-12 h-12 mr-3 rounded-full" 
+            />
             <View>
-              <Text className="text-xs font-manrope text-brand-secondary">Good Morning</Text>
-              <Text className="text-lg font-kumbh-bold text-brand-dark">Oghenetega</Text>
+              <Text className="text-xs font-manrope text-brand-secondary">
+                {state.greeting}
+              </Text>
+              <Text className="text-lg font-kumbh-bold text-brand-dark">
+                {state.profile?.full_name || 'iLearn User'}
+              </Text>
             </View>
           </View>
           <View className="flex-row gap-3">
-            {/* Replaced Search with Video Call */}
             <TouchableOpacity onPress={() => router.push('/book-session')} className="items-center justify-center w-10 h-10 rounded-full bg-brand-light">
               <Ionicons name="videocam-outline" size={20} color="#285A48" />
             </TouchableOpacity>
@@ -187,10 +178,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* 2. DYNAMIC PROMO CAROUSEL */}
         <PromoCarousel />
 
-        {/* 3. SCROLLABLE CATEGORIES */}
         <View className="mt-8">
           <View className="flex-row items-center justify-between px-6 mb-4">
             <Text className="text-lg font-kumbh-bold text-brand-dark">Categories</Text>
@@ -198,7 +187,6 @@ export default function HomeScreen() {
               <Text className="text-sm font-manrope-semi text-brand-secondary">View all</Text>
             </TouchableOpacity>
           </View>
-          
           <ScrollView horizontal showsHorizontalScrollIndicator={false} className="px-6">
             {CATEGORIES.map((cat, index) => (
               <TouchableOpacity key={cat.id} onPress={() => router.push('/search')} className={`items-center mr-6 ${index === CATEGORIES.length - 1 ? 'mr-12' : ''}`}>
@@ -211,7 +199,6 @@ export default function HomeScreen() {
           </ScrollView>
         </View>
 
-        {/* 4. OUR TOP PICK FOR YOU (Highlighted Large Card) */}
         <View className="px-6 mt-8">
           <Text className="mb-4 text-lg font-kumbh-bold text-brand-dark">Our Top Pick For You</Text>
           <TouchableOpacity 
@@ -239,7 +226,6 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 5. MULTIPLE DYNAMIC SECTIONS */}
         <CourseSection title="Featured Courses" courses={COURSES.slice(0, 3)} />
         <CourseSection title="Trending Now" courses={COURSES.slice(2, 5).reverse()} />
         <CourseSection title="Newest Courses" courses={[COURSES[4], COURSES[0], COURSES[2]]} />
