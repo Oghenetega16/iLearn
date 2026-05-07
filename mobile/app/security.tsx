@@ -1,12 +1,20 @@
-import { View, Text, ScrollView, TouchableOpacity, Switch } from 'react-native';
+// mobile/app/(auth)/security.tsx
+import { View, Text, ScrollView, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useSecurity } from '@/hooks/profile/useSecurity';
 
 export default function SecurityScreen() {
-  const [biometric, setBiometric] = useState(true);
-  const [twoFactor, setTwoFactor] = useState(false);
+  const { state, handlers } = useSecurity();
+
+  if (state.loading) {
+    return (
+      <View className="items-center justify-center flex-1 bg-brand-background">
+        <ActivityIndicator size="large" color="#285A48" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-brand-background">
@@ -30,8 +38,8 @@ export default function SecurityScreen() {
               <Text className="text-base font-manrope-bold text-brand-dark">Biometric Login</Text>
             </View>
             <Switch 
-              value={biometric} 
-              onValueChange={setBiometric} 
+              value={state.biometric} 
+              onValueChange={handlers.handleBiometricToggle} 
               trackColor={{ false: '#E5E5EA', true: '#285A48' }}
               thumbColor="#FFFFFF"
             />
@@ -47,8 +55,16 @@ export default function SecurityScreen() {
               </View>
             </View>
             <Switch 
-              value={twoFactor} 
-              onValueChange={setTwoFactor} 
+              value={state.twoFactor} 
+              onValueChange={(newValue) => {
+                if (newValue) {
+                  // Route to the setup flow if they are turning it on
+                  router.push('/two-factor-setup');
+                } else {
+                  // Disable it directly if they are turning it off
+                  handlers.handleTwoFactorToggle(false);
+                }
+              }} 
               trackColor={{ false: '#E5E5EA', true: '#285A48' }}
               thumbColor="#FFFFFF"
             />
@@ -56,8 +72,12 @@ export default function SecurityScreen() {
         </View>
 
         <Text className="mb-4 text-lg font-kumbh-bold text-brand-dark">Account</Text>
-        
-        <TouchableOpacity className="flex-row items-center justify-between p-5 mb-3 bg-white border shadow-sm rounded-2xl border-gray-50">
+
+        {/* Route to Change Password */}
+        <TouchableOpacity 
+          onPress={() => router.push('/change-password')}
+          className="flex-row items-center justify-between p-5 mb-3 bg-white border shadow-sm rounded-2xl border-gray-50"
+        >
           <View className="flex-row items-center">
             <View className="items-center justify-center w-10 h-10 mr-4 bg-gray-100 rounded-full">
               <Ionicons name="lock-closed-outline" size={20} color="#091413" />
@@ -67,7 +87,11 @@ export default function SecurityScreen() {
           <Ionicons name="chevron-forward" size={20} color="#8E8E93" />
         </TouchableOpacity>
 
-        <TouchableOpacity className="flex-row items-center justify-between p-5 bg-white border shadow-sm rounded-2xl border-gray-50">
+        {/* Route to Device History Screen */}
+        <TouchableOpacity 
+          onPress={() => router.push('/device-history')}
+          className="flex-row items-center justify-between p-5 bg-white border shadow-sm rounded-2xl border-gray-50"
+        >
           <View className="flex-row items-center">
             <View className="items-center justify-center w-10 h-10 mr-4 bg-gray-100 rounded-full">
               <Ionicons name="time-outline" size={20} color="#091413" />
