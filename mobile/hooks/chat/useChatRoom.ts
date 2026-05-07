@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FlatList } from 'react-native';
 import { supabase } from '../../lib/supabase';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // <-- NEW IMPORT
 
 export interface Message {
   id: string;
@@ -20,6 +21,13 @@ export function useChatRoom(otherUserId: string) {
   const flatListRef = useRef<FlatList>(null);
   const isAI = otherUserId === 'ai_tutor';
 
+  // --- NEW: AUTO-SAVE AI CHAT TO DEVICE ---
+  useEffect(() => {
+    if (isAI && messages.length > 0) {
+      AsyncStorage.setItem('ai_chat_history', JSON.stringify(messages));
+    }
+  }, [messages, isAI]);
+
   // 1. INITIALIZATION & FETCHING
   useEffect(() => {
     let channel: any = null;
@@ -30,12 +38,17 @@ export function useChatRoom(otherUserId: string) {
       setMyUserId(user.id);
 
       if (isAI) {
-        // --- AI WELCOME MESSAGE ---
-        setMessages([{
-          id: 'welcome_ai',
-          text: "Hello! I'm your personal AI tutor. Need help understanding a concept?",
-          isUser: false,
-        }]);
+        // --- LOAD AI CHAT FROM DEVICE MEMORY ---
+        const savedHistory = await AsyncStorage.getItem('ai_chat_history');
+        if (savedHistory) {
+          setMessages(JSON.parse(savedHistory));
+        } else {
+          setMessages([{
+            id: 'welcome_ai',
+            text: "Hello! I'm your personal AI tutor. Need help understanding a concept?",
+            isUser: false,
+          }]);
+        }
         return; 
       }
 
@@ -116,22 +129,16 @@ export function useChatRoom(otherUserId: string) {
 
     setInputText(''); 
 
-    // Optimistic UI Update
     const optimisticMsg: Message = { id: Date.now().toString(), text: textToSend, isUser: true };
     setMessages(prev => [...prev, optimisticMsg]);
     setIsTyping(true);
 
-    // --- SCENARIO A: SENDING TO THE AI ---
     if (isAI) {
       try {
         const { data, error } = await supabase.functions.invoke('chat-ai', {
-          body: { 
-            message: textToSend,
-            history: messages 
-          }
+          body: { message: textToSend, history: messages }
         });
 
-        // 1. Unmasked the error here!
         if (error) throw error; 
 
         setMessages(prev => [...prev, {
@@ -141,9 +148,7 @@ export function useChatRoom(otherUserId: string) {
         }]);
 
       } catch (e: any) {
-        // 2. Will print the true error to your terminal
         console.error("🔥 REAL AI ERROR DETAILS:", e.message || e);
-        
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
           text: "I'm having trouble connecting to my servers right now. Please try again in a moment.",
@@ -152,10 +157,9 @@ export function useChatRoom(otherUserId: string) {
       } finally {
         setIsTyping(false);
       }
-      return; // Stop here, AI is done!
+      return; 
     }
 
-    // --- SCENARIO B: SENDING TO A REAL HUMAN ---
     if (!myUserId) {
       setIsTyping(false);
       return; 

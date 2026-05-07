@@ -3,11 +3,10 @@ import { View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useChatRoom, Message } from '../../hooks/chat/useChatRoom'; // <-- Updated import
+import { useChatRoom, Message } from '../../hooks/chat/useChatRoom';
 
 export default function ChatRoomScreen() {
   const { id, name } = useLocalSearchParams<{ id: string, name: string }>();
-  // Pass the ID to the hook so it knows who to fetch!
   const { state, setters, handlers } = useChatRoom(id);
 
   const renderMessage = ({ item }: { item: Message }) => {
@@ -31,25 +30,28 @@ export default function ChatRoomScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-brand-background">
-      {/* Header */}
-      <View className="flex-row items-center px-4 py-3 bg-white border-b border-gray-100">
-        <TouchableOpacity onPress={() => router.back()} className="p-2 mr-2">
-          <Ionicons name="chevron-back" size={28} color="#285A48" />
-        </TouchableOpacity>
-        <View className="items-center justify-center w-10 h-10 mr-3 border border-gray-100 rounded-full shadow-sm bg-brand-light">
-          <Ionicons name={id === 'ai_tutor' ? "hardware-chip" : "person"} size={20} color="#285A48" />
-        </View>
-        <View className="flex-1">
-          <Text className="text-lg font-kumbh-bold text-brand-dark">{name || 'Chat'}</Text>
-          <Text className="text-xs font-manrope text-brand-primary">Online</Text>
-        </View>
-      </View>
-
+    <SafeAreaView className="flex-1 bg-brand-background" edges={['top']}>
+      {/* FIX 2: Added a slight offset for iOS to guarantee it clears the keyboard lip */}
       <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
         className="flex-1"
       >
+        {/* Header */}
+        <View className="flex-row items-center px-4 py-3 bg-white border-b border-gray-100">
+          <TouchableOpacity onPress={() => router.back()} className="p-2 mr-2">
+            <Ionicons name="chevron-back" size={28} color="#285A48" />
+          </TouchableOpacity>
+          <View className="items-center justify-center w-10 h-10 mr-3 border border-gray-100 rounded-full shadow-sm bg-brand-light">
+            <Ionicons name={id === 'ai_tutor' ? "hardware-chip" : "person"} size={20} color="#285A48" />
+          </View>
+          <View className="flex-1">
+            <Text className="text-lg font-kumbh-bold text-brand-dark">{name || 'Chat'}</Text>
+            <Text className="text-xs font-manrope text-brand-primary">Online</Text>
+          </View>
+        </View>
+
+        {/* Chat List */}
         <FlatList
           ref={state.flatListRef}
           data={state.messages}
