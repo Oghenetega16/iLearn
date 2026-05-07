@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.oghenetega16.ilearn" 
     },
     "android": {
       "adaptiveIcon": {
@@ -39,7 +40,7 @@
             "backgroundColor": "#000000"
           }
         }
-      ],
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
