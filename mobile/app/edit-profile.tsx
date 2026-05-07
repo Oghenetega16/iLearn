@@ -66,7 +66,22 @@ export default function EditProfileScreen() {
                   onChangeText={setters.setFullName}
                   placeholder="Your Name"
                   placeholderTextColor="#8E8E93"
-                  className="flex-1 text-base font-manrope text-brand-dark" 
+                  className="flex-1 ml-3 text-base font-manrope text-brand-dark" 
+                />
+              </View>
+            </View>
+
+            {/* Bio / Professional Role Input */}
+            <View>
+              <Text className="mb-2 text-sm font-manrope-semi text-brand-dark">Professional Role</Text>
+              <View className="flex-row items-center px-4 py-2 bg-white border border-gray-200 shadow-sm h-14 rounded-2xl">
+                <Ionicons name="briefcase-outline" size={20} color="#8E8E93" className="mr-3" />
+                <TextInput 
+                  value={state.role}
+                  onChangeText={setters.setRole}
+                  placeholder="e.g. Frontend Developer, Designer"
+                  placeholderTextColor="#8E8E93"
+                  className="flex-1 ml-3 text-base font-manrope text-brand-dark" 
                 />
               </View>
             </View>
@@ -81,7 +96,7 @@ export default function EditProfileScreen() {
                   editable={false}
                   placeholder="hello@example.com"
                   placeholderTextColor="#8E8E93"
-                  className="flex-1 text-base font-manrope text-brand-secondary" 
+                  className="flex-1 ml-3 text-base font-manrope text-brand-secondary" 
                 />
               </View>
             </View>

@@ -30,58 +30,63 @@ export default function ProfileScreen() {
         
         {/* Header & Avatar */}
         <View className="items-center px-6 pt-8 pb-6">
-        <View className="relative">
+          <View className="relative">
             <Image 
-            source={{ 
+              source={{ 
                 uri: state.profile?.avatar_url || 
                 `https://ui-avatars.com/api/?name=${state.profile?.full_name || 'User'}&background=9BFD7B&color=091413` 
-            }} 
-            className="border-4 border-white rounded-full shadow-sm w-28 h-28" 
+              }} 
+              className="bg-gray-100 border-4 border-white rounded-full shadow-sm w-28 h-28" 
             />
-            <TouchableOpacity className="absolute bottom-0 right-0 items-center justify-center w-8 h-8 border-2 border-white rounded-full bg-brand-primary">
-            <Ionicons name="pencil" size={14} color="#FFF" />
+            {/* Pencil Icon routing to Edit Profile */}
+            <TouchableOpacity 
+              onPress={() => router.push('/edit-profile')}
+              className="absolute bottom-0 right-0 items-center justify-center w-8 h-8 border-2 border-white rounded-full bg-brand-primary"
+            >
+              <Ionicons name="pencil" size={14} color="#FFF" />
             </TouchableOpacity>
-        </View>
-        
-        {/* Dynamic Name from Supabase */}
-        <Text className="mt-4 text-2xl font-kumbh-bold text-brand-dark">
+          </View>
+          
+          {/* Dynamic Name from Supabase */}
+          <Text className="mt-4 text-2xl font-kumbh-bold text-brand-dark">
             {state.profile?.full_name || 'iLearn User'}
-        </Text>
-        
-        <Text className="mt-1 italic font-manrope text-brand-secondary">
-            {state.profile?.role || 'Learning enthusiast'}
-        </Text>
+          </Text>
+          
+          {/* Dynamic Role/Bio strictly from Database */}
+          <Text className="mt-1 italic font-manrope text-brand-secondary">
+            {state.profile?.role}
+          </Text>
         </View>
 
-        {/* Stats Row - Now Dynamic */}
+        {/* Stats Row */}
         <View className="flex-row justify-between p-6 mx-6 mb-8 bg-white border shadow-sm rounded-3xl border-gray-50">
-        <View className="items-center">
+          <View className="items-center">
             <Text className="text-2xl font-kumbh-bold text-brand-primary">
-            {state.profile?.courses_count || 0}
+              {state.profile?.courses_count || 0}
             </Text>
             <Text className="mt-1 text-xs font-manrope-semi text-brand-secondary">Courses</Text>
-        </View>
-        
-        <View className="w-[1px] h-full bg-gray-100" />
-        
-        <View className="items-center">
+          </View>
+          
+          <View className="w-[1px] h-full bg-gray-100" />
+          
+          <View className="items-center">
             <Text className="text-2xl font-kumbh-bold text-brand-primary">
-            {state.profile?.learning_hours || 0}
+              {state.profile?.learning_hours || 0}
             </Text>
             <Text className="mt-1 text-xs font-manrope-semi text-brand-secondary">Hours</Text>
-        </View>
-        
-        <View className="w-[1px] h-full bg-gray-100" />
-        
-        <TouchableOpacity 
+          </View>
+          
+          <View className="w-[1px] h-full bg-gray-100" />
+          
+          <TouchableOpacity 
             className="items-center"
             onPress={() => router.push({ pathname: "/certificate/[id]", params: { id: '1' } })}
-        >
+          >
             <Text className="text-2xl font-kumbh-bold text-brand-primary">
-            {state.profile?.certificates_count || 0}
+              {state.profile?.certificates_count || 0}
             </Text>
             <Text className="mt-1 text-xs font-manrope-semi text-brand-secondary">Certificates</Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
         </View>
 
         {/* Menu List */}

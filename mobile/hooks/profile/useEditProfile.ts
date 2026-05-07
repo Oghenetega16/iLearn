@@ -10,8 +10,8 @@ export function useEditProfile() {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [role, setRole] = useState(''); // <-- New State
   
-  // Country States
   const [country, setCountry] = useState('Nigeria');
   const [countryCode, setCountryCode] = useState<CountryCode>('NG');
   const [callingCode, setCallingCode] = useState('234');
@@ -32,9 +32,10 @@ export function useEditProfile() {
       if (user) {
         setEmail(user.email || '');
         
+        // Fetch 'role' from profiles
         const { data, error } = await supabase
           .from('profiles')
-          .select('full_name, phone, avatar_url, country, country_code')
+          .select('full_name, phone, avatar_url, country, country_code, role')
           .eq('id', user.id)
           .maybeSingle();
 
@@ -43,6 +44,7 @@ export function useEditProfile() {
           setFullName(data.full_name || '');
           setPhone(data.phone || '');
           setAvatarUrl(data.avatar_url || null);
+          setRole(data.role || ''); // <-- Set the role
           if (data.country) setCountry(data.country);
           if (data.country_code) setCountryCode(data.country_code as CountryCode);
         }
@@ -63,7 +65,6 @@ export function useEditProfile() {
   };
 
   const pickImage = async () => {
-    // ... (Keep your existing pickImage logic)
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Denied', 'We need access to your camera roll to update your picture.');
@@ -84,7 +85,6 @@ export function useEditProfile() {
   };
 
   const uploadAvatar = async (base64Str: string, fileUri: string) => {
-    // ... (Keep your existing uploadAvatar logic)
     try {
       setUploading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -125,9 +125,10 @@ export function useEditProfile() {
         .from('profiles')
         .update({
           full_name: fullName,
-          phone: phone, // This saves just the local number
+          phone: phone,
           country: country,
           country_code: countryCode,
+          role: role, // <-- Save the role
           avatar_url: avatarUrl,
           updated_at: new Date()
         })
@@ -143,8 +144,8 @@ export function useEditProfile() {
   };
 
   return {
-    state: { fullName, email, phone, country, countryCode, callingCode, showPicker, avatarUrl, loading, uploading },
-    setters: { setFullName, setPhone, setShowPicker },
+    state: { fullName, email, phone, country, countryCode, callingCode, showPicker, avatarUrl, loading, uploading, role },
+    setters: { setFullName, setPhone, setShowPicker, setRole },
     handlers: { pickImage, handleSaveChanges, onSelectCountry }
   };
 }

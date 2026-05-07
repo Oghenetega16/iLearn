@@ -40,15 +40,6 @@
           }
         }
       ],
-      [
-        "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.com.ilearn",
-          "enableGooglePay": true
-        }
-      ],
-      "expo-secure-store",
-      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
