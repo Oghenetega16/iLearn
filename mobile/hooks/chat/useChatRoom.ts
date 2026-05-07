@@ -30,16 +30,16 @@ export function useChatRoom(otherUserId: string) {
       setMyUserId(user.id);
 
       if (isAI) {
-        // AI Welcome Message
+        // --- AI WELCOME MESSAGE ---
         setMessages([{
           id: 'welcome_ai',
           text: "Hello! I'm your personal AI tutor. Need help understanding a concept?",
           isUser: false,
         }]);
-        return; // Stop here, AI doesn't use the database
+        return; 
       }
 
-      // Human Logic: Find if a room already exists
+      // --- HUMAN ROOM LOGIC ---
       const { data: myRooms } = await supabase
         .from('room_participants')
         .select('room_id')
@@ -48,7 +48,6 @@ export function useChatRoom(otherUserId: string) {
       if (myRooms && myRooms.length > 0) {
         const roomIds = myRooms.map(r => r.room_id);
         
-        // Find the specific room shared with the other user
         const { data: sharedRoom } = await supabase
           .from('room_participants')
           .select('room_id')
@@ -66,19 +65,18 @@ export function useChatRoom(otherUserId: string) {
 
     initChat();
 
-    // Cleanup subscription on unmount
     return () => {
       if (channel) supabase.removeChannel(channel);
     };
   }, [otherUserId]);
 
-  // 2. FETCH EXISTING MESSAGES
+  // 2. FETCH EXISTING MESSAGES (Humans Only)
   const fetchMessages = async (currentRoomId: string, currentMyId: string) => {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
       .eq('room_id', currentRoomId)
-      .order('created_at', { ascending: true }); // Oldest first, so FlatList scrolls down
+      .order('created_at', { ascending: true });
 
     if (data && !error) {
       const formattedMessages = data.map(msg => ({
@@ -91,7 +89,7 @@ export function useChatRoom(otherUserId: string) {
     }
   };
 
-  // 3. REALTIME SUBSCRIPTION
+  // 3. REALTIME SUBSCRIPTION (Humans Only)
   const subscribeToRealtime = (currentRoomId: string, currentMyId: string) => {
     return supabase.channel(`room_${currentRoomId}`)
       .on(
@@ -99,7 +97,6 @@ export function useChatRoom(otherUserId: string) {
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${currentRoomId}` },
         (payload) => {
           const newMsg = payload.new;
-          // Only add it if we didn't just send it (to avoid double rendering optimistic UI)
           if (newMsg.sender_id !== currentMyId) {
             setMessages(prev => [...prev, {
               id: newMsg.id,
@@ -112,34 +109,53 @@ export function useChatRoom(otherUserId: string) {
       ).subscribe();
   };
 
-  // 4. SEND MESSAGE LOGIC
+  // 4. SEND MESSAGE LOGIC (Handles both AI and Humans)
   const sendMessage = async () => {
     const textToSend = inputText.trim();
     if (!textToSend) return;
 
-    setInputText(''); // Clear instantly for good UX
+    setInputText(''); 
 
     // Optimistic UI Update
     const optimisticMsg: Message = { id: Date.now().toString(), text: textToSend, isUser: true };
     setMessages(prev => [...prev, optimisticMsg]);
     setIsTyping(true);
 
+    // --- SCENARIO A: SENDING TO THE AI ---
     if (isAI) {
-      // Fake AI Network Delay
-      setTimeout(() => {
+      try {
+        const { data, error } = await supabase.functions.invoke('chat-ai', {
+          body: { 
+            message: textToSend,
+            history: messages 
+          }
+        });
+
+        // 1. Unmasked the error here!
+        if (error) throw error; 
+
         setMessages(prev => [...prev, {
-          id: (Date.now() + 1).toString(),
-          text: "That is a great question! I am ready to process this when connected to an LLM.",
+          id: Date.now().toString(),
+          text: data.reply,
           isUser: false,
         }]);
+
+      } catch (e: any) {
+        // 2. Will print the true error to your terminal
+        console.error("🔥 REAL AI ERROR DETAILS:", e.message || e);
+        
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          text: "I'm having trouble connecting to my servers right now. Please try again in a moment.",
+          isUser: false,
+        }]);
+      } finally {
         setIsTyping(false);
-      }, 1500);
-      return;
+      }
+      return; // Stop here, AI is done!
     }
 
-    // --- REAL DATABASE SEND ---
-    
-    // TypeScript Safety Check: If it's a human chat, we MUST have a myUserId
+    // --- SCENARIO B: SENDING TO A REAL HUMAN ---
     if (!myUserId) {
       setIsTyping(false);
       return; 
@@ -148,26 +164,21 @@ export function useChatRoom(otherUserId: string) {
     try {
       let activeRoomId = roomId;
 
-      // If no room exists yet (first time chatting), create it NOW
       if (!activeRoomId) {
-        // 1. Create Room
         const { data: newRoom, error: roomErr } = await supabase.from('rooms').insert({}).select().single();
         if (roomErr || !newRoom) throw roomErr;
         
         activeRoomId = newRoom.id;
         setRoomId(activeRoomId);
 
-        // 2. Add Both Participants
         await supabase.from('room_participants').insert([
           { room_id: activeRoomId as string, user_id: myUserId },
           { room_id: activeRoomId as string, user_id: otherUserId }
         ]);
 
-        // 3. Start listening to this new room
         subscribeToRealtime(activeRoomId as string, myUserId);
       }
 
-      // Insert the actual message
       await supabase.from('messages').insert({
         room_id: activeRoomId as string,
         sender_id: myUserId,
@@ -176,7 +187,6 @@ export function useChatRoom(otherUserId: string) {
 
     } catch (error) {
       console.error("Error sending message:", error);
-      // Optional: Show an error icon next to the optimistic message
     } finally {
       setIsTyping(false);
     }
