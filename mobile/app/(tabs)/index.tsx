@@ -169,11 +169,12 @@ export default function HomeScreen() {
             </View>
           </View>
           <View className="flex-row gap-3">
-            <TouchableOpacity onPress={() => router.push('/book-session')} className="items-center justify-center w-10 h-10 rounded-full bg-brand-light">
+            {/* Temporarily routing to a hardcoded test room instead of the booking page */}
+            <TouchableOpacity 
+              onPress={() => router.push('/call/test-room-123')} 
+              className="items-center justify-center w-10 h-10 rounded-full bg-brand-light"
+            >
               <Ionicons name="videocam-outline" size={20} color="#285A48" />
-            </TouchableOpacity>
-            <TouchableOpacity className="items-center justify-center w-10 h-10 rounded-full bg-brand-light" onPress={() => router.push('/notifications')}>
-              <Ionicons name="notifications-outline" size={20} color="#285A48" />
             </TouchableOpacity>
           </View>
         </View>

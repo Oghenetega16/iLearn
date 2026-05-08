@@ -106,7 +106,7 @@ export default function MessagesInboxScreen() {
           
           {!state.loading && state.chats.length === 1 && state.searchQuery && (
             <Text className="mt-8 text-center font-manrope text-brand-secondary">
-              No users found matching "{state.searchQuery}"
+              No users found matching &ldquo;{state.searchQuery}&rdquo;
             </Text>
           )}
         </View>
