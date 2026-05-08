@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.oghenetega16.ilearn" 
+      "bundleIdentifier": "com.oghenetega16.ilearn"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +21,13 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.oghenetega16.ilearn"
+      "package": "com.oghenetega16.ilearn",
+      "permissions": [
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.WAKE_LOCK"
+      ]
     },
     "web": {
       "output": "static",
@@ -40,11 +46,45 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      [
+        "@stream-io/video-react-native-sdk",
+        {
+          "cameraPermissionText": "iLearn needs camera access for live tutoring sessions.",
+          "microphonePermissionText": "iLearn needs microphone access for live tutoring sessions."
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "iLearn needs camera access for live tutoring sessions.",
+          "microphonePermission": "iLearn needs microphone access for live tutoring sessions."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 24,
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b03bd72f-ce76-4be1-b386-f7ffbbdc0b1f"
+      }
     }
   }
 }
