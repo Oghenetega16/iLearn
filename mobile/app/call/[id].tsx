@@ -118,11 +118,7 @@ export default function VideoCallScreen() {
     <SafeAreaView className="flex-1 bg-black" edges={['top', 'bottom']}>
       <StreamVideo client={videoClient}>
         <StreamCall call={activeCall}>
-          <View style={StyleSheet.absoluteFill}>
-            <CallContent 
-              onHangupCallHandler={() => router.back()} 
-            />
-          </View>
+            <ClassroomLayout />
         </StreamCall>
       </StreamVideo>
     </SafeAreaView>
