@@ -9,7 +9,7 @@
       "distribution": "internal",
       "env": {
         "npm_config_legacy_peer_deps": "true",
-        "ORG_GRADLE_PROJECT_kotlin.jvm.target.validation.mode": "warning"
+        "ORG_GRADLE_PROJECT_kotlin.jvm.target.validation.mode": "IGNORE"
       }
     },
     "preview": {

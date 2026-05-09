@@ -66,11 +66,19 @@ export default function VideoCallScreen() {
         const call = client.call('default', roomId);
         await call.join({ create: true });
 
-        if (isMounted) {
-          setVideoClient(client);
-          setActiveCall(call);
+        // THE FIX: Check if the user navigated away during the async requests
+        if (!isMounted) {
+          call.leave();
+          client.disconnectUser();
+          return;
         }
+
+        // If still mounted, safely update the UI state
+        setVideoClient(client);
+        setActiveCall(call);
+        
       } catch (err: any) {
+        // The previously missing catch block
         console.error("Video Setup Error:", err);
         if (isMounted) setError(err.message);
       }
