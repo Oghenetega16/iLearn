@@ -1,126 +1,78 @@
 // mobile/app/call/[id].tsx
 import { useEffect, useState } from 'react';
-import { View, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { ActivityIndicator, Text } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { supabase } from '../../lib/supabase';
-import {
-  StreamVideo,
-  StreamVideoClient,
-  StreamCall,
-  Call,
-  CallContent,
-} from '@stream-io/video-react-native-sdk';
-
-const STREAM_API_KEY = process.env.EXPO_PUBLIC_STREAM_API_KEY;
+import { ClassroomLayout } from '@/components/ClassroomLayout';
+import { useVideoCall } from '@/contexts/VideoContext';
+import { StreamCall } from '@stream-io/video-react-native-sdk';
 
 export default function VideoCallScreen() {
   const { id: roomId } = useLocalSearchParams<{ id: string }>();
-  const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(null);
-  const [activeCall, setActiveCall] = useState<Call | null>(null);
+  const { activeCall, joinCall, minimizeCall } = useVideoCall();
+  
   const [error, setError] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(true);
 
+  // --- 1. Join the Call via the Global Context ---
   useEffect(() => {
-    if (!STREAM_API_KEY) {
-      setError("Stream API Key is missing in .env");
-      return;
-    }
-
     let isMounted = true;
-    let client: StreamVideoClient;
 
-    const setupVideo = async () => {
+    const setup = async () => {
       try {
-        // 1. Get current logged-in user
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("You must be logged in to join a call.");
-
-        // 2. Fetch profile data (optional, but makes the video UI look great)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('full_name, avatar_url')
-          .eq('id', user.id)
-          .single();
-
-        // 3. Ask our Edge Function for the secure Stream Token
-        const { data: tokenData, error: tokenError } = await supabase.functions.invoke('video-token', {
-          body: { userId: user.id }
-        });
-
-        if (tokenError || !tokenData?.token) {
-          throw new Error("Failed to secure video token from server.");
+        // Only join if we aren't already in this specific room
+        if (activeCall?.id !== roomId) {
+          await joinCall(roomId);
         }
-
-        // 4. Initialize the Stream Video Client
-        client = StreamVideoClient.getOrCreateInstance({
-          apiKey: STREAM_API_KEY,
-          user: { 
-            id: user.id, 
-            name: profile?.full_name || 'iLearn Student', 
-            image: profile?.avatar_url 
-          },
-          token: tokenData.token,
-        });
-
-        // 5. Create or Join the specific room ID
-        const call = client.call('default', roomId);
-        await call.join({ create: true });
-
-        // THE FIX: Check if the user navigated away during the async requests
-        if (!isMounted) {
-          call.leave();
-          client.disconnectUser();
-          return;
-        }
-
-        // If still mounted, safely update the UI state
-        setVideoClient(client);
-        setActiveCall(call);
-        
       } catch (err: any) {
-        // The previously missing catch block
-        console.error("Video Setup Error:", err);
         if (isMounted) setError(err.message);
+      } finally {
+        if (isMounted) setIsJoining(false);
       }
     };
 
-    setupVideo();
+    setup();
 
-    // Cleanup: Leave the call and disconnect when the user hits the back button
+    // --- 2. The Minimize Cleanup ---
+    // When the user hits the hardware back button or navigates away,
+    // we DO NOT disconnect. We minimize the call to trigger the floating UI!
     return () => {
       isMounted = false;
-      if (activeCall) activeCall.leave();
-      if (client) client.disconnectUser();
+      // We only minimize if there's an active call. The actual hangup logic
+      // is now handled by the big red button in your ClassroomLayout or MiniPlayer.
+      if (activeCall) {
+        minimizeCall();
+      }
     };
-  }, [roomId]);
+  }, [roomId, activeCall]);
 
   // --- UI STATES ---
   if (error) {
     return (
-      <SafeAreaView className="items-center justify-center flex-1 bg-brand-background">
+      <SafeAreaView className="items-center justify-center flex-1 bg-[#111114]">
         <Text className="px-6 mb-4 text-center text-red-500 font-kumbh-bold">{error}</Text>
-        <Text onPress={() => router.back()} className="text-brand-primary font-manrope-bold">Go Back</Text>
+        <Text onPress={() => router.back()} className="text-white font-manrope-bold">Go Back</Text>
       </SafeAreaView>
     );
   }
 
-  if (!videoClient || !activeCall) {
+  // Show a loader while the Context negotiates the backend tokens
+  if (isJoining || !activeCall) {
     return (
-      <SafeAreaView className="items-center justify-center flex-1 bg-brand-background">
-        <ActivityIndicator size="large" color="#285A48" />
-        <Text className="mt-4 text-brand-dark font-manrope">Securing connection...</Text>
+      <SafeAreaView className="items-center justify-center flex-1 bg-[#111114]">
+        <ActivityIndicator size="large" color="#A8C7FA" />
+        <Text className="mt-4 text-gray-300 font-manrope">Securing connection...</Text>
       </SafeAreaView>
     );
   }
 
   // --- THE GOOGLE MEET UI ---
+  // Notice we removed <StreamVideo> here because it now wraps the entire app in _layout.tsx!
   return (
     <SafeAreaView className="flex-1 bg-black" edges={['top', 'bottom']}>
-      <StreamVideo client={videoClient}>
-        <StreamCall call={activeCall}>
-            <ClassroomLayout />
-        </StreamCall>
-      </StreamVideo>
+      <StreamCall call={activeCall}>
+        <ClassroomLayout />
+      </StreamCall>
     </SafeAreaView>
   );
 }
