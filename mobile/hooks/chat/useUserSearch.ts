@@ -17,54 +17,48 @@ export function useUserSearch() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    // Don't fetch anything until the user has typed something
+    if (searchQuery.trim().length === 0 && activeTab === 'all') {
+      setUsers([]);
+      setLoading(false);
+      return;
+    }
+
+    const debounceTimer = setTimeout(async () => {
       setLoading(true);
-      
-      // 1. Get current user so we don't show ourselves in the search results
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) return;
 
-      // 2. Start the database query
       let query = supabase
         .from('profiles')
-        .select('id, full_name, role') // Note: Add 'bio' here if you add a bio column to your DB
+        .select('id, full_name, role')
         .neq('id', currentUser.id);
 
-      // 3. Apply Name Search
       if (searchQuery.trim().length > 0) {
         query = query.ilike('full_name', `%${searchQuery.trim()}%`);
       }
 
-      // 4. Apply Role Filter
       if (activeTab !== 'all') {
-        const roleFilter = activeTab === 'students' ? 'student' : 'tutor';
-        query = query.eq('role', roleFilter);
+        query = query.eq('role', activeTab === 'students' ? 'student' : 'tutor');
       }
 
-      // 5. Limit results to keep it fast
       query = query.limit(20);
 
       const { data, error } = await query;
 
       if (!error && data) {
-        const formattedUsers: PlatformUser[] = data.map(u => ({
+        setUsers(data.map(u => ({
           id: u.id,
           name: u.full_name || 'Anonymous User',
-          role: (u.role === 'tutor' ? 'tutor' : 'student'),
-          bio: u.role === 'tutor' ? 'Platform Tutor' : 'Platform Student', // Fallback bio
+          role: (u.role === 'tutor' ? 'tutor' : 'student') as 'student' | 'tutor',
+          bio: u.role === 'tutor' ? 'Platform Tutor' : 'Platform Student',
           icon: 'person'
-        }));
-        setUsers(formattedUsers);
+        })));
       } else {
         setUsers([]);
       }
-      
-      setLoading(false);
-    };
 
-    // Debounce: Wait 300ms after the user stops typing before making the DB call
-    const debounceTimer = setTimeout(() => {
-      fetchUsers();
+      setLoading(false);
     }, 300);
 
     return () => clearTimeout(debounceTimer);

@@ -84,11 +84,19 @@ export default function SearchUsersScreen() {
             !state.loading ? (
               <View className="items-center justify-center mt-12">
                 <View className="items-center justify-center w-20 h-20 mb-4 bg-gray-100 rounded-full">
-                  <Ionicons name="search" size={32} color="#8E8E93" />
+                  <Ionicons 
+                    name={state.searchQuery.length > 0 ? "search" : "people-outline"} 
+                    size={32} 
+                    color="#8E8E93" 
+                  />
                 </View>
-                <Text className="text-base text-center font-manrope-bold text-brand-dark">No users found</Text>
+                <Text className="text-base text-center font-manrope-bold text-brand-dark">
+                  {state.searchQuery.length > 0 ? 'No users found' : 'Search for study partners'}
+                </Text>
                 <Text className="mt-1 text-sm text-center font-manrope text-brand-secondary">
-                  Try adjusting your search or filters
+                  {state.searchQuery.length > 0 
+                    ? 'Try adjusting your search or filters' 
+                    : 'Type a name above to find someone to chat with'}
                 </Text>
               </View>
             ) : null

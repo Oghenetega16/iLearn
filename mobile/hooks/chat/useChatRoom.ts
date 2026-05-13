@@ -17,7 +17,7 @@ export function useChatRoom(otherUserId: string) {
   const [isTyping, setIsTyping] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [myUserId, setMyUserId] = useState<string | null>(null);
-  
+
   const flatListRef = useRef<FlatList>(null);
   const isAI = otherUserId === 'ai_tutor';
 
@@ -57,22 +57,50 @@ export function useChatRoom(otherUserId: string) {
             isUser: false,
           }]);
         }
-        return; 
+        return;
       }
 
       // --- HUMAN ROOM LOGIC ---
-      // Check if we already have a shared room with this participant
+      // Check if a shared room already exists
       const { data: sharedRoom, error: rpcError } = await supabase.rpc('get_shared_room', {
         user_a: user.id,
         user_b: otherUserId
       });
 
+      let activeRoomId: string | null = null;
+
       if (!rpcError && sharedRoom && sharedRoom[0]) {
-        const activeId = sharedRoom[0].room_id;
-        setRoomId(activeId);
-        fetchMessages(activeId, user.id);
-        channel = subscribeToRealtime(activeId, user.id);
+        // Room exists — use it
+        activeRoomId = sharedRoom[0].room_id;
+      } else {
+        // Room doesn't exist yet — create it immediately on open
+        const { data: newRoom, error: roomErr } = await supabase
+          .from('rooms')
+          .insert({})
+          .select()
+          .single();
+
+        if (roomErr) {
+          console.error("Failed to create room:", roomErr);
+          return;
+        }
+
+        activeRoomId = newRoom.id;
+
+        const { error: partErr } = await supabase.from('room_participants').insert([
+          { room_id: activeRoomId, user_id: user.id },
+          { room_id: activeRoomId, user_id: otherUserId }
+        ]);
+
+        if (partErr) {
+          console.error("Failed to add participants:", partErr);
+          return;
+        }
       }
+
+      setRoomId(activeRoomId);
+      fetchMessages(activeRoomId, user.id);
+      channel = subscribeToRealtime(activeRoomId, user.id);
     };
 
     initChat();
@@ -91,20 +119,19 @@ export function useChatRoom(otherUserId: string) {
       .order('created_at', { ascending: true });
 
     if (data && !error) {
-      const formattedMessages = data.map(msg => ({
+      setMessages(data.map(msg => ({
         id: msg.id,
         text: msg.content,
         isUser: msg.sender_id === currentMyId,
         created_at: msg.created_at
-      }));
-      setMessages(formattedMessages);
+      })));
     }
   };
 
   // 3. REALTIME SUBSCRIPTION
   const subscribeToRealtime = (currentRoomId: string, currentMyId: string) => {
     const channelName = `room_${currentRoomId}_${Date.now()}`;
-    
+
     return supabase.channel(channelName)
       .on(
         'postgres_changes',
@@ -125,11 +152,10 @@ export function useChatRoom(otherUserId: string) {
 
   // 4. SEND MESSAGE LOGIC
   const sendMessage = async () => {
-
     const textToSend = inputText.trim();
     if (!textToSend || !myUserId) return;
 
-    // Force the session onto the client before any DB calls
+    // Force session hydration before DB calls
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
       await supabase.auth.setSession({
@@ -138,7 +164,7 @@ export function useChatRoom(otherUserId: string) {
       });
     }
 
-    setInputText(''); 
+    setInputText('');
     const optimisticMsg: Message = { id: Date.now().toString(), text: textToSend, isUser: true };
     setMessages(prev => [...prev, optimisticMsg]);
     setIsTyping(true);
@@ -148,7 +174,7 @@ export function useChatRoom(otherUserId: string) {
         const { data, error } = await supabase.functions.invoke('chat-ai', {
           body: { message: textToSend, history: messages }
         });
-        if (error) throw error; 
+        if (error) throw error;
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
           text: data.reply,
@@ -159,49 +185,25 @@ export function useChatRoom(otherUserId: string) {
       } finally {
         setIsTyping(false);
       }
-      return; 
+      return;
     }
 
     // --- HUMAN MESSAGE FLOW ---
     try {
-      let activeRoomId = roomId;
-
-      // STEP 1 & 2: Dynamic Creation
-      if (!activeRoomId) {
-        // Create the Room (Allowed by the new SQL INSERT policy)
-        const { data: { session } } = await supabase.auth.getSession();
-        const { data: newRoom, error: roomErr } = await supabase
-          .from('rooms')
-          .insert({})
-          .select()
-          .single();
-
-          console.log("ROOM INSERT RESULT:", JSON.stringify({ data: newRoom, error: roomErr }));
-        
-        if (roomErr) throw roomErr;
-        activeRoomId = newRoom.id;
-
-        // Add Participants (Creator + Recipient)
-        const { error: partErr } = await supabase.from('room_participants').insert([
-          { room_id: activeRoomId, user_id: myUserId },
-          { room_id: activeRoomId, user_id: otherUserId }
-        ]);
-        
-        if (partErr) throw partErr;
-
-        setRoomId(activeRoomId);
-        subscribeToRealtime(activeRoomId, myUserId);
+      if (!roomId) {
+        console.error("Room not ready yet");
+        return;
       }
 
-      // STEP 3: Update metadata
+      // Update metadata
       await supabase
         .from('rooms')
         .update({ last_message_at: new Date().toISOString() })
-        .eq('id', activeRoomId);
+        .eq('id', roomId);
 
-      // STEP 4: Send the message
+      // Send the message
       const { error: msgErr } = await supabase.from('messages').insert({
-        room_id: activeRoomId,
+        room_id: roomId,
         sender_id: myUserId,
         content: textToSend
       });
@@ -210,7 +212,6 @@ export function useChatRoom(otherUserId: string) {
 
     } catch (error) {
       console.error("Critical Chat Error:", error);
-      // Optional: Remove optimistic message if error occurs
     } finally {
       setIsTyping(false);
     }
