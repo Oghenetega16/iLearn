@@ -1,5 +1,5 @@
 // mobile/app/(tabs)/tutor.tsx
-import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -13,7 +13,7 @@ export default function MessagesInboxScreen() {
   };
 
   const ChatRow = ({ chat }: { chat: ChatItem }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       onPress={() => router.push({
         pathname: '/chat/[id]',
         params: { id: chat.id, name: chat.name }
@@ -22,8 +22,16 @@ export default function MessagesInboxScreen() {
     >
       {/* Avatar */}
       <View className="relative mr-4">
-        <View className={`items-center justify-center border rounded-full shadow-sm w-14 h-14 ${chat.isPinned ? 'bg-brand-light border-brand-primary/30' : 'bg-white border-gray-100'}`}>
-          <Ionicons name={chat.icon as any} size={24} color="#285A48" />
+        <View className={`items-center justify-center border rounded-full shadow-sm w-14 h-14 overflow-hidden ${chat.isPinned ? 'bg-brand-light border-brand-primary/30' : 'bg-white border-gray-100'}`}>
+          {chat.avatarUrl ? (
+            <Image
+              source={{ uri: chat.avatarUrl }}
+              className="rounded-full w-14 h-14"
+              resizeMode="cover"
+            />
+          ) : (
+            <Ionicons name={chat.icon as any} size={24} color="#285A48" />
+          )}
         </View>
         {chat.isOnline && (
           <View className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full" />
@@ -53,15 +61,17 @@ export default function MessagesInboxScreen() {
           </Text>
         </View>
         <View className="flex-row items-center justify-between">
-          <Text 
-            className={`flex-1 pr-4 text-sm font-manrope ${chat.unread > 0 ? 'text-brand-dark font-manrope-bold' : 'text-brand-secondary'}`} 
+          <Text
+            className={`flex-1 pr-4 text-sm font-manrope ${chat.unread > 0 ? 'text-brand-dark font-manrope-bold' : 'text-brand-secondary'}`}
             numberOfLines={1}
           >
             {chat.lastMessage}
           </Text>
           {chat.unread > 0 && (
-            <View className="items-center justify-center w-5 h-5 rounded-full bg-brand-primary">
-              <Text className="text-xs text-white font-manrope-bold">{chat.unread}</Text>
+            <View className="items-center justify-center min-w-[20px] h-5 px-1 rounded-full bg-brand-primary">
+              <Text className="text-xs text-white font-manrope-bold">
+                {chat.unread > 99 ? '99+' : chat.unread}
+              </Text>
             </View>
           )}
         </View>
