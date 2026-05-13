@@ -8,6 +8,9 @@ import {
 } from '@stream-io/video-react-native-sdk';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
+// 1. Global tracker: Remembers which rooms have already shown the invite UI
+const dismissedInvites = new Set<string>();
+
 export const ClassroomLayout = () => {
   const call = useCall();
   const { 
@@ -20,25 +23,28 @@ export const ClassroomLayout = () => {
 
   const localParticipant = useLocalParticipant();
   const remoteParticipants = useRemoteParticipants();
+  
   const isRecording = useIsCallRecordingInProgress();
   const { status: micStatus } = useMicrophoneState();
   const { status: camStatus } = useCameraState();
 
   const [isRecordingLoading, setIsRecordingLoading] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
-  
-  // NEW: State to control the visibility of the big invite UI
-  const [showFullInvite, setShowFullInvite] = useState(true);
+
+  // 2. State checks if we should show the invite (defaults to false if already dismissed)
+  const [showInvite, setShowInvite] = useState(call ? !dismissedInvites.has(call.id) : false);
 
   // --- AUTO-HIDE INVITE TIMER ---
   useEffect(() => {
-    // Hide the big invite section after 15 seconds
-    const hideTimer = setTimeout(() => {
-      setShowFullInvite(false);
-    }, 15000); 
+    if (showInvite && call) {
+      const hideTimer = setTimeout(() => {
+        setShowInvite(false);
+        dismissedInvites.add(call.id); // Mark as permanently dismissed
+      }, 15000); 
 
-    return () => clearTimeout(hideTimer);
-  }, []);
+      return () => clearTimeout(hideTimer);
+    }
+  }, [showInvite, call]);
 
   // --- RECORDING TIMER ---
   useEffect(() => {
@@ -98,22 +104,22 @@ export const ClassroomLayout = () => {
   return (
     <View className="flex-1 bg-[#111114]">
       {/* TOP HEADER */}
-      <View className="z-10 flex-row items-center justify-between p-4 pt-12">
-        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 rounded-full bg-[#282A2D] items-center justify-center">
+      <View className="absolute top-0 left-0 right-0 z-10 flex-row items-center justify-between p-4 pt-12">
+        <TouchableOpacity onPress={() => router.back()} className="w-10 h-10 rounded-full bg-[#282A2D]/80 items-center justify-center">
           <MaterialCommunityIcons name="arrow-left" size={24} color="white" />
         </TouchableOpacity>
 
         <View className="flex-row items-center">
           {isRecording && (
-            <View className="flex-row items-center px-3 py-1.5 bg-red-500/20 rounded-2xl mr-2">
-              <View className="w-2 h-2 mr-2 bg-red-500 rounded-full" />
-              <Text className="text-sm font-bold text-red-500 tabular-nums">{formatTime(recordingTime)}</Text>
+            <View className="flex-row items-center px-3 py-1.5 bg-red-500/80 rounded-2xl mr-2">
+              <View className="w-2 h-2 mr-2 bg-white rounded-full" />
+              <Text className="text-sm font-bold text-white tabular-nums">{formatTime(recordingTime)}</Text>
             </View>
           )}
 
-          {/* NEW: Top right share icon appears when big UI hides OR when someone joins */}
-          {(!showFullInvite || remoteParticipants.length > 0) && (
-            <TouchableOpacity onPress={shareMeetingLink} className="w-10 h-10 rounded-full bg-[#282A2D] items-center justify-center">
+          {/* Share icon appears when big UI hides OR when someone joins */}
+          {(!showInvite || remoteParticipants.length > 0) && (
+            <TouchableOpacity onPress={shareMeetingLink} className="w-10 h-10 rounded-full bg-[#282A2D]/80 items-center justify-center">
               <MaterialCommunityIcons name="share-variant" size={20} color="white" />
             </TouchableOpacity>
           )}
@@ -122,17 +128,21 @@ export const ClassroomLayout = () => {
 
       {/* MAIN CONTENT AREA */}
       {remoteParticipants.length === 0 ? (
-        <View className="justify-center flex-1 px-6 pb-20">
-          <Text className="mb-2 text-2xl font-semibold text-white">You&apos;re the only one here</Text>
-          
-          {/* Automatically hides after 15 seconds */}
-          {showFullInvite && (
-            <View>
+        <View className="flex-1 bg-black">
+          {/* 3. Meet Behavior: Local video is FULL SCREEN when you are alone */}
+          {localParticipant && (
+            <ParticipantView participant={localParticipant} style={StyleSheet.absoluteFill} />
+          )}
+
+          {/* 4. Floating Glass Invite Card */}
+          {showInvite && (
+            <View className="absolute z-20 p-5 bg-[#202124]/95 rounded-2xl bottom-32 left-4 right-4 border border-white/10">
+              <Text className="mb-2 text-xl font-semibold text-white">You&apos;re the only one here</Text>
               <Text className="mb-6 text-sm text-gray-300">
                 Share this meeting link with others that you want in the meeting
               </Text>
               
-              <TouchableOpacity onPress={shareMeetingLink} className="bg-[#282A2D] flex-row justify-between items-center p-4 rounded-xl mb-6">
+              <TouchableOpacity onPress={shareMeetingLink} className="bg-[#3C4043] flex-row justify-between items-center p-4 rounded-xl mb-6">
                 <Text className="text-base text-gray-200">{call.id}</Text>
                 <MaterialCommunityIcons name="content-copy" size={20} color="white" />
               </TouchableOpacity>
@@ -145,7 +155,7 @@ export const ClassroomLayout = () => {
           )}
         </View>
       ) : (
-        <ScrollView className="flex-1" contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', padding: 8, paddingBottom: 140 }}>
+        <ScrollView className="flex-1" contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', padding: 8, paddingTop: 100, paddingBottom: 140 }}>
           {remoteParticipants.map((participant) => (
             <View 
               key={participant.sessionId} 
@@ -159,15 +169,15 @@ export const ClassroomLayout = () => {
         </ScrollView>
       )}
 
-      {/* FLOATING LOCAL VIDEO (PIP) */}
-      {localParticipant && (
-        <View className="absolute bottom-28 right-4 w-[110px] h-[160px] rounded-xl overflow-hidden bg-[#3C4043] shadow-lg shadow-black/50">
+      {/* FLOATING LOCAL VIDEO (PIP) - ONLY show if there is someone else in the room */}
+      {localParticipant && remoteParticipants.length > 0 && (
+        <View className="absolute bottom-28 right-4 w-[110px] h-[160px] rounded-xl overflow-hidden bg-[#3C4043] shadow-lg shadow-black/50 z-30">
           <ParticipantView participant={localParticipant} style={StyleSheet.absoluteFill} />
         </View>
       )}
 
       {/* GOOGLE MEET BOTTOM CONTROL BAR */}
-      <View className="absolute left-2 right-2 bottom-6">
+      <View className="absolute z-40 left-2 right-2 bottom-6">
         <View className="flex-row items-center justify-evenly px-2 py-3 bg-[#1E1F22] rounded-3xl">
           <TouchableOpacity 
             className={`w-12 h-12 rounded-full justify-center items-center ${camStatus === 'enabled' ? 'bg-[#333537]' : 'bg-[#EA4335]'}`}

@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { FlatList } from 'react-native';
 import { supabase } from '../../lib/supabase';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // <-- NEW IMPORT
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface Message {
   id: string;
@@ -21,7 +21,7 @@ export function useChatRoom(otherUserId: string) {
   const flatListRef = useRef<FlatList>(null);
   const isAI = otherUserId === 'ai_tutor';
 
-  // --- NEW: AUTO-SAVE AI CHAT TO DEVICE ---
+  // --- AUTO-SAVE AI CHAT TO DEVICE ---
   useEffect(() => {
     if (isAI && messages.length > 0) {
       AsyncStorage.setItem('ai_chat_history', JSON.stringify(messages));
@@ -37,8 +37,16 @@ export function useChatRoom(otherUserId: string) {
       if (!user) return;
       setMyUserId(user.id);
 
+      // Force session hydration
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await supabase.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+      }
+
       if (isAI) {
-        // --- LOAD AI CHAT FROM DEVICE MEMORY ---
         const savedHistory = await AsyncStorage.getItem('ai_chat_history');
         if (savedHistory) {
           setMessages(JSON.parse(savedHistory));
@@ -53,26 +61,17 @@ export function useChatRoom(otherUserId: string) {
       }
 
       // --- HUMAN ROOM LOGIC ---
-      const { data: myRooms } = await supabase
-        .from('room_participants')
-        .select('room_id')
-        .eq('user_id', user.id);
+      // Check if we already have a shared room with this participant
+      const { data: sharedRoom, error: rpcError } = await supabase.rpc('get_shared_room', {
+        user_a: user.id,
+        user_b: otherUserId
+      });
 
-      if (myRooms && myRooms.length > 0) {
-        const roomIds = myRooms.map(r => r.room_id);
-        
-        const { data: sharedRoom } = await supabase
-          .from('room_participants')
-          .select('room_id')
-          .in('room_id', roomIds)
-          .eq('user_id', otherUserId)
-          .single();
-
-        if (sharedRoom) {
-          setRoomId(sharedRoom.room_id);
-          fetchMessages(sharedRoom.room_id, user.id);
-          channel = subscribeToRealtime(sharedRoom.room_id, user.id);
-        }
+      if (!rpcError && sharedRoom && sharedRoom[0]) {
+        const activeId = sharedRoom[0].room_id;
+        setRoomId(activeId);
+        fetchMessages(activeId, user.id);
+        channel = subscribeToRealtime(activeId, user.id);
       }
     };
 
@@ -83,7 +82,7 @@ export function useChatRoom(otherUserId: string) {
     };
   }, [otherUserId]);
 
-  // 2. FETCH EXISTING MESSAGES (Humans Only)
+  // 2. FETCH EXISTING MESSAGES
   const fetchMessages = async (currentRoomId: string, currentMyId: string) => {
     const { data, error } = await supabase
       .from('messages')
@@ -102,9 +101,11 @@ export function useChatRoom(otherUserId: string) {
     }
   };
 
-  // 3. REALTIME SUBSCRIPTION (Humans Only)
+  // 3. REALTIME SUBSCRIPTION
   const subscribeToRealtime = (currentRoomId: string, currentMyId: string) => {
-    return supabase.channel(`room_${currentRoomId}`)
+    const channelName = `room_${currentRoomId}_${Date.now()}`;
+    
+    return supabase.channel(channelName)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages', filter: `room_id=eq.${currentRoomId}` },
@@ -122,13 +123,22 @@ export function useChatRoom(otherUserId: string) {
       ).subscribe();
   };
 
-  // 4. SEND MESSAGE LOGIC (Handles both AI and Humans)
+  // 4. SEND MESSAGE LOGIC
   const sendMessage = async () => {
+
     const textToSend = inputText.trim();
-    if (!textToSend) return;
+    if (!textToSend || !myUserId) return;
+
+    // Force the session onto the client before any DB calls
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+    }
 
     setInputText(''); 
-
     const optimisticMsg: Message = { id: Date.now().toString(), text: textToSend, isUser: true };
     setMessages(prev => [...prev, optimisticMsg]);
     setIsTyping(true);
@@ -138,59 +148,69 @@ export function useChatRoom(otherUserId: string) {
         const { data, error } = await supabase.functions.invoke('chat-ai', {
           body: { message: textToSend, history: messages }
         });
-
         if (error) throw error; 
-
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
           text: data.reply,
           isUser: false,
         }]);
-
       } catch (e: any) {
-        console.error("🔥 REAL AI ERROR DETAILS:", e.message || e);
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          text: "I'm having trouble connecting to my servers right now. Please try again in a moment.",
-          isUser: false,
-        }]);
+        console.error("AI Error:", e.message);
       } finally {
         setIsTyping(false);
       }
       return; 
     }
 
-    if (!myUserId) {
-      setIsTyping(false);
-      return; 
-    }
-
+    // --- HUMAN MESSAGE FLOW ---
     try {
       let activeRoomId = roomId;
 
+      // STEP 1 & 2: Dynamic Creation
       if (!activeRoomId) {
-        const { data: newRoom, error: roomErr } = await supabase.from('rooms').insert({}).select().single();
-        if (roomErr || !newRoom) throw roomErr;
+        // Create the Room (Allowed by the new SQL INSERT policy)
+        const { data: { session } } = await supabase.auth.getSession();
+        const { data: newRoom, error: roomErr } = await supabase
+          .from('rooms')
+          .insert({})
+          .select()
+          .single();
+
+          console.log("ROOM INSERT RESULT:", JSON.stringify({ data: newRoom, error: roomErr }));
         
+        if (roomErr) throw roomErr;
         activeRoomId = newRoom.id;
-        setRoomId(activeRoomId);
 
-        await supabase.from('room_participants').insert([
-          { room_id: activeRoomId as string, user_id: myUserId },
-          { room_id: activeRoomId as string, user_id: otherUserId }
+        // Add Participants (Creator + Recipient)
+        const { error: partErr } = await supabase.from('room_participants').insert([
+          { room_id: activeRoomId, user_id: myUserId },
+          { room_id: activeRoomId, user_id: otherUserId }
         ]);
+        
+        if (partErr) throw partErr;
 
-        subscribeToRealtime(activeRoomId as string, myUserId);
+        setRoomId(activeRoomId);
+        subscribeToRealtime(activeRoomId, myUserId);
       }
 
-      await supabase.from('messages').insert({
-        room_id: activeRoomId as string,
+      // STEP 3: Update metadata
+      await supabase
+        .from('rooms')
+        .update({ last_message_at: new Date().toISOString() })
+        .eq('id', activeRoomId);
+
+      // STEP 4: Send the message
+      const { error: msgErr } = await supabase.from('messages').insert({
+        room_id: activeRoomId,
         sender_id: myUserId,
         content: textToSend
       });
 
+      if (msgErr) throw msgErr;
+
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Critical Chat Error:", error);
+      // Optional: Remove optimistic message if error occurs
     } finally {
       setIsTyping(false);
     }

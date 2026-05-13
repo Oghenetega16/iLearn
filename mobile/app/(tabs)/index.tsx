@@ -1,10 +1,12 @@
 // mobile/app/(tabs)/index.tsx
+import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Image, TouchableOpacity, Dimensions, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useHome } from '../../hooks/tabs/useHome'; // Import the new logic hook
+import { useHome } from '../../hooks/tabs/useHome'; 
 
 const { width } = Dimensions.get('window');
 
@@ -168,14 +170,29 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
+
+          {/* RIGHT ACTION BUTTONS */}
           <View className="flex-row gap-3">
-            {/* Temporarily routing to a hardcoded test room instead of the booking page */}
+            
+            {/* Notification Button */}
             <TouchableOpacity 
-              onPress={() => router.push('/call/test-room-123')} 
+              onPress={() => router.push('/notifications')}
+              className="items-center justify-center w-10 h-10 rounded-full bg-brand-light"
+            >
+              <Ionicons name="notifications-outline" size={20} color="#285A48" />
+            </TouchableOpacity>
+
+            {/* Video Call Button - Now generates unique, secure UUIDs */}
+            <TouchableOpacity 
+              onPress={() => {
+                const newRoomId = uuidv4();
+                router.push(`/call/${newRoomId}`);
+              }} 
               className="items-center justify-center w-10 h-10 rounded-full bg-brand-light"
             >
               <Ionicons name="videocam-outline" size={20} color="#285A48" />
             </TouchableOpacity>
+            
           </View>
         </View>
 

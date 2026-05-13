@@ -1,7 +1,7 @@
 // mobile/hooks/profile/useNotifications.ts
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { formatDistanceToNow } from 'date-fns'; // Great for "2 hours ago" formatting
+import { formatDistanceToNow } from 'date-fns'; 
 
 export interface Notification {
   id: string;
@@ -19,13 +19,18 @@ export function useNotifications() {
   useEffect(() => {
     fetchNotifications();
 
-    // Set up Realtime Subscription for new notifications
+    // 1. Declare the channel variable in the synchronous React scope
+    let channel: ReturnType<typeof supabase.channel>;
+
     const setupRealtime = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const channel = supabase
-        .channel('public:notifications')
+      // 2. Generate a totally unique channel topic to prevent cross-component collisions
+      const uniqueChannelTopic = `notifications-${user.id}-${Date.now()}`;
+
+      channel = supabase
+        .channel(uniqueChannelTopic)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
@@ -34,11 +39,16 @@ export function useNotifications() {
           }
         )
         .subscribe();
-
-      return () => { supabase.removeChannel(channel); };
     };
 
     setupRealtime();
+
+    // 3. Return the cleanup function directly to React, NOT inside the async block
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
   }, []);
 
   const fetchNotifications = async () => {

@@ -50,20 +50,30 @@ export default function ChatRoomScreen() {
           <View className="items-center justify-center w-10 h-10 mr-3 border border-gray-100 rounded-full shadow-sm bg-brand-light">
             <Ionicons name={id === 'ai_tutor' ? "hardware-chip" : "person"} size={20} color="#285A48" />
           </View>
+          
+          {/* flex-1 pushes the video button to the far right */}
           <View className="flex-1">
             <Text className="text-lg font-kumbh-bold text-brand-dark">{name || 'Chat'}</Text>
             <Text className="text-xs font-manrope text-brand-primary">Online</Text>
           </View>
+
+          {/* THE MAGIC VIDEO BUTTON - Hides for AI Tutor */}
+          {id !== 'ai_tutor' && (
+            <TouchableOpacity 
+              onPress={() => {
+                // By passing the chat 'id' directly into the video router, 
+                // you guarantee both users join the exact same video room!
+                router.push(`/call/${id}`);
+              }}
+              className="items-center justify-center w-10 h-10 rounded-full bg-brand-light"
+            >
+              <Ionicons name="videocam-outline" size={22} color="#285A48" />
+            </TouchableOpacity>
+          )}
+
         </View>
       </View>
 
-      {/* 
-        KEY CHANGES vs original:
-        - iOS: keyboardVerticalOffset tells KAV exactly how tall the manual header is,
-          so it knows how much to slide the content up — input lands flush on the keyboard.
-        - Android: behavior='height' shrinks the KAV's total height as the keyboard rises,
-          which is the most reliable Android pattern (avoids double-offset issues).
-      */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? keyboardVerticalOffset : 0}
