@@ -1,4 +1,4 @@
-// mobile/app/chat/[id].tsx
+// mobile/app/group/[id].tsx
 import {
   View, Text, TextInput, TouchableOpacity, KeyboardAvoidingView,
   Platform, FlatList, ActivityIndicator, Image, Modal, Pressable, Alert, Linking
@@ -7,14 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState, useEffect } from 'react';
-import { useChatRoom, Message, formatMessageTime, formatDateLabel, formatPresence, formatFileSize } from '../../hooks/chat/useChatRoom';
-import { useVideoCall } from '../../contexts/VideoContext';
-import { supabase } from '../../lib/supabase';
+import { useGroupChat, GroupMessage, formatMessageTime, formatDateLabel, formatFileSize } from '../../hooks/chat/useGroupChat';
+import { useGroups } from '../../hooks/chat/useGroups';
 
 const HEADER_CONTENT_HEIGHT = 56;
 
-const injectDateSeparators = (messages: Message[]) => {
-  const result: (Message | { id: string; type: 'separator'; label: string })[] = [];
+const injectDateSeparators = (messages: GroupMessage[]) => {
+  const result: (GroupMessage | { id: string; type: 'separator'; label: string })[] = [];
   let lastDateLabel = '';
   for (const msg of messages) {
     const label = formatDateLabel(msg.created_at);
@@ -27,42 +26,29 @@ const injectDateSeparators = (messages: Message[]) => {
   return result;
 };
 
-const isImageType = (mimeType?: string | null) =>
-  mimeType?.startsWith('image/') ?? false;
+const isImageType = (mimeType?: string | null) => mimeType?.startsWith('image/') ?? false;
 
-export default function ChatRoomScreen() {
-  const { id, name } = useLocalSearchParams<{ id: string, name: string }>();
-  const { state, setters, handlers } = useChatRoom(id);
+export default function GroupChatScreen() {
+  const { id, name, joining } = useLocalSearchParams<{ id: string; name: string; joining?: string }>();
+  const { state, setters, handlers } = useGroupChat(id);
+  const { actions } = useGroups();
   const insets = useSafeAreaInsets();
   const keyboardVerticalOffset = insets.top + HEADER_CONTENT_HEIGHT;
 
   const [menuVisible, setMenuVisible] = useState(false);
-  const [menuMessage, setMenuMessage] = useState<Message | null>(null);
-  const [avatarVisible, setAvatarVisible] = useState(false);
+  const [menuMessage, setMenuMessage] = useState<GroupMessage | null>(null);
   const [attachMenuVisible, setAttachMenuVisible] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [myId, setMyId] = useState<string | null>(null);
 
   const messagesWithSeparators = injectDateSeparators(state.messages);
-  const presenceText = id === 'ai_tutor' ? 'Online' : formatPresence(state.otherUserPresence);
-  const isOnline = id === 'ai_tutor' ? true : state.otherUserPresence.isOnline;
-  const generateDirectRoomId = (userId1: string, userId2: string): string => {
-  // Sort so both users always get the same ID regardless of who opens chat first
-  const sorted = [userId1, userId2].sort().join('');
-  // Take first 32 chars of each UUID (remove hyphens) — guaranteed under 64 chars
-  const condensed = sorted.replace(/-/g, '').substring(0, 32);
-    return `dc_${condensed}`; // dc_ prefix = direct call, total = 35 chars
-  };
-
-  const directRoomId = myId ? generateDirectRoomId(myId, id) : null;
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) setMyId(user.id);
-    });
-  }, []);
+  if (joining === 'true') {
+    actions.joinGroup(id);
+  }
+}, [joining]);
 
-  const handleLongPress = (msg: Message) => {
+  const handleLongPress = (msg: GroupMessage) => {
     if (!msg.isUser) return;
     setMenuMessage(msg);
     setMenuVisible(true);
@@ -83,42 +69,33 @@ export default function ChatRoomScreen() {
     ]);
   };
 
-  // Render file attachment bubble
-  const renderFileBubble = (msg: Message) => {
+  const renderFileBubble = (msg: GroupMessage) => {
     const isImage = isImageType(msg.file_type);
-    const isUser = msg.isUser;
-
     if (isImage && msg.file_url) {
       return (
         <TouchableOpacity onPress={() => setPreviewImage(msg.file_url!)}>
-          <Image
-            source={{ uri: msg.file_url }}
-            style={{ width: 200, height: 200, borderRadius: 12 }}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: msg.file_url }} style={{ width: 200, height: 200, borderRadius: 12 }} resizeMode="cover" />
         </TouchableOpacity>
       );
     }
-
-    // Document bubble
     return (
       <TouchableOpacity
         onPress={() => msg.file_url && Linking.openURL(msg.file_url)}
-        className={`flex-row items-center p-3 rounded-2xl ${isUser ? 'bg-brand-primary/80' : 'bg-gray-100'}`}
+        className={`flex-row items-center p-3 rounded-2xl ${msg.isUser ? 'bg-brand-primary/80' : 'bg-gray-100'}`}
         style={{ maxWidth: 220 }}
       >
-        <View className={`w-10 h-10 rounded-xl items-center justify-center mr-3 ${isUser ? 'bg-white/20' : 'bg-brand-primary/10'}`}>
-          <Ionicons name="document-text-outline" size={22} color={isUser ? '#fff' : '#285A48'} />
+        <View className={`w-10 h-10 rounded-xl items-center justify-center mr-3 ${msg.isUser ? 'bg-white/20' : 'bg-brand-primary/10'}`}>
+          <Ionicons name="document-text-outline" size={22} color={msg.isUser ? '#fff' : '#285A48'} />
         </View>
         <View className="flex-1">
-          <Text className={`text-sm font-manrope-bold ${isUser ? 'text-white' : 'text-brand-dark'}`} numberOfLines={2}>
+          <Text className={`text-sm font-manrope-bold ${msg.isUser ? 'text-white' : 'text-brand-dark'}`} numberOfLines={2}>
             {msg.file_name}
           </Text>
-          <Text className={`text-xs font-manrope mt-0.5 ${isUser ? 'text-white/70' : 'text-brand-secondary'}`}>
+          <Text className={`text-xs font-manrope mt-0.5 ${msg.isUser ? 'text-white/70' : 'text-brand-secondary'}`}>
             {formatFileSize(msg.file_size)}
           </Text>
         </View>
-        <Ionicons name="download-outline" size={18} color={isUser ? '#fff' : '#285A48'} />
+        <Ionicons name="download-outline" size={18} color={msg.isUser ? '#fff' : '#285A48'} />
       </TouchableOpacity>
     );
   };
@@ -134,7 +111,7 @@ export default function ChatRoomScreen() {
       );
     }
 
-    const msg = item as Message;
+    const msg = item as GroupMessage;
     const timeStr = formatMessageTime(msg.created_at);
     const hasFile = !!msg.file_url;
     const hasText = !!msg.text;
@@ -160,17 +137,28 @@ export default function ChatRoomScreen() {
       );
     }
 
+    // Other user's message — show avatar and name
     return (
-      <View className="self-start max-w-[80%] mb-4 items-start">
-        {hasFile && renderFileBubble(msg)}
-        {hasText && (
-          <View className="p-4 mt-1 bg-white border rounded-tl-sm shadow-sm rounded-3xl border-gray-50">
-            <Text className="leading-5 font-manrope text-brand-dark">{msg.text}</Text>
+      <View className="self-start max-w-[80%] mb-4 items-start flex-row">
+        <View className="items-center justify-center w-8 h-8 mt-1 mr-2 overflow-hidden rounded-full bg-brand-light shrink-0">
+          {msg.senderAvatar ? (
+            <Image source={{ uri: msg.senderAvatar }} className="w-8 h-8 rounded-full" resizeMode="cover" />
+          ) : (
+            <Ionicons name="person" size={16} color="#285A48" />
+          )}
+        </View>
+        <View className="flex-1">
+          <Text className="mb-1 text-xs font-manrope-bold text-brand-secondary">{msg.senderName}</Text>
+          {hasFile && renderFileBubble(msg)}
+          {hasText && (
+            <View className="p-4 mt-1 bg-white border rounded-tl-sm shadow-sm rounded-3xl border-gray-50">
+              <Text className="leading-5 font-manrope text-brand-dark">{msg.text}</Text>
+            </View>
+          )}
+          <View className="flex-row items-center gap-1 mt-1 ml-1">
+            {msg.is_edited && <Text className="text-[10px] font-manrope text-brand-secondary italic">edited</Text>}
+            {timeStr && <Text className="text-[10px] font-manrope text-brand-secondary">{timeStr}</Text>}
           </View>
-        )}
-        <View className="flex-row items-center gap-1 mt-1 ml-1">
-          {msg.is_edited && <Text className="text-[10px] font-manrope text-brand-secondary italic">edited</Text>}
-          {timeStr && <Text className="text-[10px] font-manrope text-brand-secondary">{timeStr}</Text>}
         </View>
       </View>
     );
@@ -184,35 +172,32 @@ export default function ChatRoomScreen() {
           <TouchableOpacity onPress={() => router.back()} className="p-2 mr-2">
             <Ionicons name="chevron-back" size={28} color="#285A48" />
           </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => { if (state.otherUserAvatarUrl) setAvatarVisible(true); }}
-            className="relative mr-3"
-          >
-            <View className="items-center justify-center w-10 h-10 overflow-hidden border border-gray-100 rounded-full shadow-sm bg-brand-light">
-              {state.otherUserAvatarUrl ? (
-                <Image source={{ uri: state.otherUserAvatarUrl }} className="w-10 h-10 rounded-full" resizeMode="cover" />
-              ) : (
-                <Ionicons name={id === 'ai_tutor' ? "hardware-chip" : "person"} size={20} color="#285A48" />
-              )}
-            </View>
-            <View className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
-          </TouchableOpacity>
+          <View className="items-center justify-center w-10 h-10 mr-3 overflow-hidden border border-gray-100 rounded-full shadow-sm bg-brand-light">
+            {state.groupInfo?.avatar_url ? (
+              <Image source={{ uri: state.groupInfo.avatar_url }} className="w-10 h-10 rounded-full" resizeMode="cover" />
+            ) : (
+              <Ionicons name="people" size={20} color="#285A48" />
+            )}
+          </View>
           <View className="flex-1">
-            <Text className="text-lg font-kumbh-bold text-brand-dark">{name || 'Chat'}</Text>
-            <Text className={`text-xs font-manrope ${isOnline ? 'text-green-500' : 'text-brand-secondary'}`}>
-              {presenceText}
+            <Text className="text-lg font-kumbh-bold text-brand-dark" numberOfLines={1}>
+              {state.groupInfo?.name || name || 'Group'}
+            </Text>
+            <Text className="text-xs font-manrope text-brand-secondary">
+              {state.groupInfo?.member_count ?? 0} members
             </Text>
           </View>
-          {id !== 'ai_tutor' && (
+          {/* Invite button */}
+          <TouchableOpacity
+            onPress={() => actions.shareInviteLink(id, state.groupInfo?.name || name)}
+            className="items-center justify-center w-10 h-10 mr-2 rounded-full bg-brand-light"
+          >
+            <Ionicons name="person-add-outline" size={20} color="#285A48" />
+          </TouchableOpacity>
+          {/* Group call button */}
+          {state.groupInfo?.call_room_id && (
             <TouchableOpacity
-              onPress={() => {
-                if (directRoomId) {
-                  router.push({
-                    pathname: '/direct-call/[id]',
-                    params: { id: directRoomId, name }
-                  });
-                }
-              }}
+              onPress={() => router.push(`/call/${state.groupInfo!.call_room_id}`)}
               className="items-center justify-center w-10 h-10 rounded-full bg-brand-light"
             >
               <Ionicons name="videocam-outline" size={22} color="#285A48" />
@@ -260,8 +245,7 @@ export default function ChatRoomScreen() {
             </View>
           )}
           <View className="flex-row items-center">
-            {/* Attachment button — hidden during edit mode and for AI */}
-            {!state.editingMessageId && id !== 'ai_tutor' && (
+            {!state.editingMessageId && (
               <TouchableOpacity
                 onPress={() => setAttachMenuVisible(true)}
                 className="items-center justify-center w-10 h-10 mr-2 bg-gray-100 rounded-full"
@@ -273,7 +257,7 @@ export default function ChatRoomScreen() {
               value={state.editingMessageId ? state.editingText : state.inputText}
               onChangeText={state.editingMessageId ? setters.setEditingText : setters.setInputText}
               onSubmitEditing={state.editingMessageId ? handlers.saveEdit : handlers.sendMessage}
-              placeholder={state.editingMessageId ? "Edit message..." : "Type a message..."}
+              placeholder={state.editingMessageId ? "Edit message..." : "Message group..."}
               placeholderTextColor="#8E8E93"
               className="flex-1 h-12 px-5 border border-gray-100 rounded-full bg-gray-50 font-manrope text-brand-dark"
             />
@@ -308,7 +292,7 @@ export default function ChatRoomScreen() {
         </Pressable>
       </Modal>
 
-      {/* Attachment picker menu */}
+      {/* Attachment picker */}
       <Modal transparent visible={attachMenuVisible} animationType="fade" onRequestClose={() => setAttachMenuVisible(false)}>
         <Pressable className="justify-end flex-1 bg-black/40" onPress={() => setAttachMenuVisible(false)}>
           <View className="px-6 pt-4 pb-10 bg-white rounded-t-3xl">
@@ -342,17 +326,7 @@ export default function ChatRoomScreen() {
         </Pressable>
       </Modal>
 
-      {/* Full-screen avatar viewer */}
-      <Modal transparent visible={avatarVisible} animationType="fade" onRequestClose={() => setAvatarVisible(false)}>
-        <Pressable className="items-center justify-center flex-1 bg-black/90" onPress={() => setAvatarVisible(false)}>
-          {state.otherUserAvatarUrl && (
-            <Image source={{ uri: state.otherUserAvatarUrl }} style={{ width: 300, height: 300, borderRadius: 12 }} resizeMode="cover" />
-          )}
-          <Text className="mt-4 text-sm text-white font-manrope opacity-60">Tap anywhere to close</Text>
-        </Pressable>
-      </Modal>
-
-      {/* Full-screen image preview */}
+      {/* Image preview */}
       <Modal transparent visible={!!previewImage} animationType="fade" onRequestClose={() => setPreviewImage(null)}>
         <Pressable className="items-center justify-center flex-1 bg-black/95" onPress={() => setPreviewImage(null)}>
           {previewImage && (

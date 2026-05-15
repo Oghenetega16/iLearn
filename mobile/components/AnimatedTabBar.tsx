@@ -1,21 +1,26 @@
-import { View, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useEffect } from 'react';
+import { useUnread } from '../contexts/UnreadContext';
 
-const { width } = Dimensions.get('window');
-
-// A sub-component for the individual tab icons so they animate independently
-const TabBarIcon = ({ isFocused, routeName, onPress }: { isFocused: boolean, routeName: string, onPress: () => void }) => {
-  // Animation values
+const TabBarIcon = ({
+  isFocused,
+  routeName,
+  onPress,
+  showDot,
+}: {
+  isFocused: boolean;
+  routeName: string;
+  onPress: () => void;
+  showDot: boolean;
+}) => {
   const translateY = useSharedValue(0);
   const opacity = useSharedValue(isFocused ? 1 : 0);
 
   useEffect(() => {
-    // The "pop up" spring animation
     translateY.value = withSpring(isFocused ? -20 : 0, { damping: 12, stiffness: 150 });
-    // Fade in the green background circle
     opacity.value = withTiming(isFocused ? 1 : 0, { duration: 200 });
   }, [isFocused]);
 
@@ -27,7 +32,6 @@ const TabBarIcon = ({ isFocused, routeName, onPress }: { isFocused: boolean, rou
     opacity: opacity.value,
   }));
 
-  // Map route names to Ionicons
   const getIconName = () => {
     switch (routeName) {
       case 'index': return isFocused ? 'home' : 'home-outline';
@@ -42,24 +46,27 @@ const TabBarIcon = ({ isFocused, routeName, onPress }: { isFocused: boolean, rou
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={1} className="items-center justify-center flex-1">
       <Animated.View style={[animatedIconStyle, styles.iconContainer]}>
-        {/* The Green Active Circle */}
         <Animated.View style={[StyleSheet.absoluteFillObject, styles.activeCircle, animatedCircleStyle]} />
-        
-        {/* The Icon wrapped in a strictly elevated View to prevent it from disappearing */}
         <View style={{ zIndex: 10, elevation: 10, alignItems: 'center', justifyContent: 'center' }}>
-          <Ionicons 
-            name={getIconName() as any} 
-            size={24} 
-            color={isFocused ? '#FFFFFF' : '#8E8E93'} // White when active, grey when inactive
+          <Ionicons
+            name={getIconName() as any}
+            size={24}
+            color={isFocused ? '#FFFFFF' : '#8E8E93'}
           />
         </View>
+
+        {/* Notification dot — only on tutor tab when not focused and has unread */}
+        {showDot && !isFocused && (
+          <View style={styles.notificationDot} />
+        )}
       </Animated.View>
     </TouchableOpacity>
   );
 };
 
-// The main Tab Bar container
 export default function AnimatedTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+  const { unreadCount } = useUnread();
+
   return (
     <View className="pt-2 pb-6 bg-brand-background">
       <View className="flex-row items-center justify-around h-16 px-2 mx-4 bg-white shadow-sm rounded-3xl" style={styles.shadow}>
@@ -72,18 +79,21 @@ export default function AnimatedTabBar({ state, descriptors, navigation }: Botto
               target: route.key,
               canPreventDefault: true,
             });
-
             if (!isFocused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
           };
 
+          // Only show dot on the tutor (messages) tab
+          const showDot = route.name === 'tutor' && unreadCount > 0;
+
           return (
-            <TabBarIcon 
-              key={route.key} 
-              isFocused={isFocused} 
-              routeName={route.name} 
-              onPress={onPress} 
+            <TabBarIcon
+              key={route.key}
+              isFocused={isFocused}
+              routeName={route.name}
+              onPress={onPress}
+              showDot={showDot}
             />
           );
         })}
@@ -108,7 +118,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activeCircle: {
-    backgroundColor: '#285A48', // Your Forest Green brand color
+    backgroundColor: '#285A48',
     borderRadius: 25,
-  }
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#EF4444',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 20,
+    elevation: 20,
+  },
 });

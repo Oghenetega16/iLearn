@@ -2,11 +2,21 @@
 import { View, Text, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useInbox, ChatItem } from '../../hooks/chat/useInbox';
+import { useCallback } from 'react';
+import { useUnread } from '../../contexts/UnreadContext';
 
 export default function MessagesInboxScreen() {
   const { state, setters } = useInbox();
+
+  const { refreshUnread } = useUnread();
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshUnread();
+    }, [refreshUnread])
+  );
 
   const handleNewChat = () => {
     router.push('/search-users');
@@ -14,10 +24,11 @@ export default function MessagesInboxScreen() {
 
   const ChatRow = ({ chat }: { chat: ChatItem }) => (
     <TouchableOpacity
-      onPress={() => router.push({
-        pathname: '/chat/[id]',
-        params: { id: chat.id, name: chat.name }
-      })}
+      onPress={() => router.push(
+        chat.isGroup
+          ? { pathname: '/group/[id]', params: { id: chat.id, name: chat.name } }
+          : { pathname: '/chat/[id]', params: { id: chat.id, name: chat.name } }
+      )}
       className={`flex-row items-center py-4 border-b ${chat.isPinned ? 'border-brand-primary/20' : 'border-gray-100'}`}
     >
       {/* Avatar */}
@@ -84,9 +95,20 @@ export default function MessagesInboxScreen() {
       {/* Header */}
       <View className="flex-row items-center justify-between px-6 py-4 bg-white border-b border-gray-100">
         <Text className="text-xl font-kumbh-bold text-brand-dark">Messages</Text>
-        <TouchableOpacity onPress={handleNewChat} className="items-center justify-center w-10 h-10 rounded-full bg-brand-light">
-          <Ionicons name="create-outline" size={20} color="#285A48" />
-        </TouchableOpacity>
+        <View className="flex-row gap-2">
+          <TouchableOpacity
+            onPress={() => router.push('/create-group')}
+            className="items-center justify-center w-10 h-10 rounded-full bg-brand-light"
+          >
+            <Ionicons name="people-outline" size={20} color="#285A48" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleNewChat}
+            className="items-center justify-center w-10 h-10 rounded-full bg-brand-light"
+          >
+            <Ionicons name="create-outline" size={20} color="#285A48" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} className="flex-1">

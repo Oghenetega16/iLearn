@@ -5,10 +5,13 @@ import { supabase } from '../lib/supabase';
 
 const STREAM_API_KEY = process.env.EXPO_PUBLIC_STREAM_API_KEY;
 
+type CallType = 'classroom' | 'direct';
+
 type VideoContextType = {
   activeCall: Call | null;
   isMinimized: boolean;
-  joinCall: (roomId: string) => Promise<void>;
+  callType: CallType;
+  joinCall: (roomId: string, type?: CallType) => Promise<void>;
   leaveCall: () => void;
   minimizeCall: () => void;
   maximizeCall: () => void;
@@ -20,15 +23,19 @@ export const VideoProvider = ({ children }: { children: ReactNode }) => {
   const [videoClient, setVideoClient] = useState<StreamVideoClient | null>(null);
   const [activeCall, setActiveCall] = useState<Call | null>(null);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [callType, setCallType] = useState<CallType>('classroom');
 
-  const joinCall = async (roomId: string) => {
+  const joinCall = async (roomId: string, type: CallType = 'classroom') => {
     if (!STREAM_API_KEY) throw new Error("Missing Stream API Key");
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Must be logged in to join.");
 
-    const { data: profile } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
-    const { data: tokenData } = await supabase.functions.invoke('video-token', { body: { userId: user.id } });
+    const { data: profile } = await supabase
+      .from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
+    const { data: tokenData } = await supabase.functions.invoke('video-token', {
+      body: { userId: user.id }
+    });
 
     if (!tokenData?.token) throw new Error("Failed to get token.");
 
@@ -43,7 +50,8 @@ export const VideoProvider = ({ children }: { children: ReactNode }) => {
 
     setVideoClient(client);
     setActiveCall(call);
-    setIsMinimized(false); // Make sure it starts full screen
+    setCallType(type);
+    setIsMinimized(false);
   };
 
   const leaveCall = () => {
@@ -51,14 +59,15 @@ export const VideoProvider = ({ children }: { children: ReactNode }) => {
     if (videoClient) videoClient.disconnectUser();
     setActiveCall(null);
     setIsMinimized(false);
+    setCallType('classroom');
   };
 
   const minimizeCall = () => setIsMinimized(true);
   const maximizeCall = () => setIsMinimized(false);
+  
 
   return (
-    <VideoContext.Provider value={{ activeCall, isMinimized, joinCall, leaveCall, minimizeCall, maximizeCall }}>
-      {/* Conditionally wrap the app in StreamVideo ONLY when a client exists */}
+    <VideoContext.Provider value={{ activeCall, isMinimized, callType, joinCall, leaveCall, minimizeCall, maximizeCall }}>
       {videoClient ? (
         <StreamVideo client={videoClient}>
           {children}
