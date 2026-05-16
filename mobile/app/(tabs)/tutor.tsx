@@ -94,7 +94,7 @@ export default function MessagesInboxScreen() {
     <SafeAreaView className="flex-1 bg-brand-background">
       {/* Header */}
       <View className="flex-row items-center justify-between px-6 py-4 bg-white border-b border-gray-100">
-        <Text className="text-xl font-kumbh-bold text-brand-dark">Messages</Text>
+        <Text className="text-2xl font-kumbh-bold text-brand-dark">Messages</Text>
         <View className="flex-row gap-2">
           <TouchableOpacity
             onPress={() => router.push('/create-group')}

@@ -34,10 +34,16 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      ["expo-image-picker", {
-        "photosPermission": "Allow iLearn to access your photos to share in chat."
-      }],
-      ["expo-document-picker", {}],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow iLearn to access your photos to share in chat."
+        }
+      ],
+      [
+        "expo-document-picker",
+        {}
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -84,7 +90,8 @@
           }
         }
       ],
-      "@config-plugins/react-native-webrtc"
+      "@config-plugins/react-native-webrtc",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,
